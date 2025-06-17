@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  invoice-analyzer:
+    build: .
+    ports:
+      - "8036:8036"
+    environment:
+      - API_KEY=${API_KEY}           # For your Gemini API key
+    volumes:
+      - .:/app
+    restart: unless-stopped
