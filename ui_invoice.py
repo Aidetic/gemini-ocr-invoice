@@ -1,8 +1,8 @@
 import os
 import tempfile
+
 import streamlit as st
-import json
-import pandas as pd
+
 from invoice_app import analyze_invoice_images
 
 # --- Session states ---
@@ -16,9 +16,11 @@ if st.button("🔄 Start New Analysis"):
     st.session_state.key_counter += 1
     st.rerun()
 
-st.title("Invoice Image Analyzer")
+st.title("Invoice Scanner")
 
-st.write("Upload **invoice image(s)** (scanned, photo, etc.) for automatic extraction and analytics.")
+st.write(
+    "Upload **invoice image(s)** (scanned, photo, etc.) for automatic extraction and analytics."
+)
 
 uploaded_files = st.file_uploader(
     "Upload invoice images (jpg, png, etc.)",
@@ -38,7 +40,9 @@ if st.session_state.uploaded_files:
         for idx, uploaded_file in enumerate(st.session_state.uploaded_files):
             with cols[idx % len(cols)]:
                 st.image(
-                    uploaded_file, caption=f"Invoice {idx + 1}", use_container_width=True
+                    uploaded_file,
+                    caption=f"Invoice {idx + 1}",
+                    use_container_width=True,
                 )
 
         if st.button("Analyze Invoice(s)"):
@@ -47,7 +51,9 @@ if st.session_state.uploaded_files:
                 # Save each uploaded image to a temp file
                 for uploaded_file in st.session_state.uploaded_files:
                     ext = os.path.splitext(uploaded_file.name)[1]
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=ext
+                    ) as tmp_file:
                         tmp_file.write(uploaded_file.getbuffer())
                         image_paths.append(tmp_file.name)
 

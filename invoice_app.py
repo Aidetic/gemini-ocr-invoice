@@ -1,11 +1,12 @@
+import json
 import os
+
+from dotenv import load_dotenv
 from google import genai
 from PIL import Image
-import streamlit as st
-from dotenv import load_dotenv
-import json
 
 load_dotenv()
+
 
 def analyze_invoice_images(image_paths):
     """
@@ -35,13 +36,13 @@ def analyze_invoice_images(image_paths):
         contents = [prompt] + images
 
         response = client.models.generate_content(
-            model="gemini-1.5-flash", contents=contents
+            model=os.environ.get("GEMINI_MODEL"), contents=contents
         )
 
         res = json.loads(response.model_dump_json())["candidates"][0]["content"][
-                            "parts"
-                        ][0]["text"]
-        
+            "parts"
+        ][0]["text"]
+
         return res
 
     except Exception as e:

@@ -1,7 +1,8 @@
 import os
+
+from dotenv import load_dotenv
 from google import genai
 from PIL import Image
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -45,7 +46,7 @@ def analyze_car_images(image_paths):
         )
 
         response = client.models.generate_content(
-            model="gemini-1.5-flash", contents=contents
+            model=os.environ.get("GEMINI_MODEL"), contents=contents
         )
         return response.model_dump_json()
 

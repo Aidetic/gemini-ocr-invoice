@@ -7,6 +7,7 @@ services:
       - "8036:8036"
     environment:
       - API_KEY=${API_KEY}           # For your Gemini API key
+      - GEMINI_MODEL=${GEMINI_MODEL}           # For your Gemini Model
     volumes:
       - .:/app
     restart: unless-stopped
