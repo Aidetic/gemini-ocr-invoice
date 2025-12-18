@@ -14,6 +14,7 @@ services:
       - ERP_SITE=site1.localhost
       - ERP_API_KEY=${ERP_API_KEY}
       - ERP_API_SECRET=${ERP_API_SECRET}
+      - PYTHONUNBUFFERED=1
     volumes:
       - .:/app
     restart: unless-stopped

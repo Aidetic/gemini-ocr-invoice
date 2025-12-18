@@ -1,6 +1,7 @@
 import os
 import requests
 import json
+from pprint import pprint
 
 ERP_URL = os.getenv("ERP_URL")
 ERP_SITE = os.getenv("ERP_SITE")
@@ -47,28 +48,44 @@ def upload_file_to_erpnext(
     return response.json()["message"]
 
 
-def create_invoice_ocr_record(
-    file_url: str,
-    ocr_raw: str,
-    ocr_json: dict | None = None,
-):
+def create_invoice_ocr_record(file_url, invoice_number):
+    """
+    Pushes OCR data to ERPNext from an external script.
+    """
+    
+    # 1. Prepare the Endpoint URL
+    # If using the standard Resource API:
+    endpoint = f"{ERP_URL}/api/resource/Invoice OCR Record"
+    
+    # 3. Prepare Payload
+    # ERPNext Resource API expects the data inside a 'data' key or as direct keys
     payload = {
-        "doctype": "Invoice OCR Record",
-        "invoice_file": file_url,
-        "ocr_raw": ocr_raw,
-        "status": "Extracted",
-        "source": "Streamlit OCR",
+        "invoice_number": invoice_number,
+        "file_url": file_url
     }
+    
+    # 4. Make the POST request
+    try:
+        response = requests.post(endpoint, json=payload, headers=HEADERS)
+        
+        # Check for success
+        if response.status_code == 200:
+            print("Successfully created record!")
+            return response.json().get("data")
+        else:
+            print(f"Failed! Status Code: {response.status_code}")
+            print(f"Error Message: {response.text}")
+            return None
+            
+    except requests.exceptions.RequestException as e:
+        print(f"Connection Error: {e}")
+        return None
 
-    if ocr_json:
-        payload["ocr_json"] = json.dumps(ocr_json, indent=2)
 
-    response = requests.post(
-        f"{ERP_URL}/api/resource/Invoice OCR Record",
-        headers=HEADERS,
-        json=payload,
-    )
-
-    response.raise_for_status()
-    return response.json()["data"]
-
+def extract_invoice_number(ocr_entities):
+    for entity in ocr_entities:
+        if entity.get("entity_type") == "invoice_number":
+            table_data = entity.get("table_data", [])
+            if table_data and isinstance(table_data, list):
+                return table_data[0].get("invoice_number")
+    return None

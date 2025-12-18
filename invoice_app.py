@@ -27,7 +27,7 @@ def analyze_invoice_images(image_paths):
 
         Return only clear markdown tables, intelligently split as per content type available.
 
-        DO NOT RETURN ANYTHING ELSE EXCEPT THE EXTRACTED TABLES.
+        DO NOT RETURN ANYTHING ELSE OTHER THAN JSON FORMAT.
 
         NO DESCRIPTION OR EXTRA INFORMATION NEEDED 
 
