@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Install OS dependencies for Pillow and Streamlit image support
 RUN apt-get update && apt-get install -y \
+    curl \
     libgl1 libglx-mesa0 \
     && rm -rf /var/lib/apt/lists/*
 

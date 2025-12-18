@@ -5,9 +5,20 @@ services:
     build: .
     ports:
       - "8036:8036"
+    networks:
+      - frappe_net
     environment:
       - API_KEY=${API_KEY}           # For your Gemini API key
       - GEMINI_MODEL=${GEMINI_MODEL}           # For your Gemini Model
+      - ERP_URL=http://host.docker.internal:8080
+      - ERP_SITE=site1.localhost
+      - ERP_API_KEY=${ERP_API_KEY}
+      - ERP_API_SECRET=${ERP_API_SECRET}
     volumes:
       - .:/app
     restart: unless-stopped
+
+networks:
+  frappe_net:
+    external: true
+    name: frappe_docker_devcontainer_default
