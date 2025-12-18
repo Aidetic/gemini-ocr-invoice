@@ -4,13 +4,11 @@ import json
 import streamlit as st
 
 from invoice_app import analyze_invoice_images
-from erpnext_client import (
-    upload_file_to_erpnext,
-    create_invoice_ocr_record,
-)
+from erpnext_client import upload_file_to_erpnext
+
 
 # -------------------------------------------------
-# Helper: Safe display
+# Helper: Safe display (TEXT or JSON)
 # -------------------------------------------------
 def safe_display(result):
     if isinstance(result, (dict, list)):
@@ -40,8 +38,8 @@ if "image_paths" not in st.session_state:
 if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
 
-if "uploaded_erp_files" not in st.session_state:
-    st.session_state.uploaded_erp_files = []
+if "erp_uploaded" not in st.session_state:
+    st.session_state.erp_uploaded = False
 
 if "key_counter" not in st.session_state:
     st.session_state.key_counter = 0
@@ -54,7 +52,7 @@ if st.button("🔄 Start New Analysis"):
     st.session_state.uploaded_files = None
     st.session_state.image_paths = []
     st.session_state.analysis_result = None
-    st.session_state.uploaded_erp_files = []
+    st.session_state.erp_uploaded = False
     st.session_state.key_counter += 1
     st.rerun()
 
@@ -62,11 +60,11 @@ if st.button("🔄 Start New Analysis"):
 # -------------------------------------------------
 # UI
 # -------------------------------------------------
-st.title("Invoice OCR → ERPNext")
+st.title("Invoice Scanner")
 
 st.write(
-    "Upload invoice images, extract OCR details using AI, "
-    "and store both the file and extracted data in ERPNext."
+    "Upload invoice images. Images are automatically uploaded to ERPNext "
+    "after analysis."
 )
 
 
@@ -94,12 +92,14 @@ if uploaded_files:
 
 
 # -------------------------------------------------
-# Analyze OCR
+# Analyze + AUTO UPLOAD IMAGE TO ERPNext
 # -------------------------------------------------
 if uploaded_files and st.button("Analyze Invoice(s)"):
-    with st.spinner("Running OCR and extraction..."):
+    with st.spinner("Analyzing invoice(s) and uploading to ERPNext..."):
+
         image_paths = []
 
+        # Save temp images
         for uploaded_file in uploaded_files:
             ext = os.path.splitext(uploaded_file.name)[1]
             with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
@@ -107,84 +107,34 @@ if uploaded_files and st.button("Analyze Invoice(s)"):
                 image_paths.append(tmp.name)
 
         st.session_state.image_paths = image_paths
-        st.session_state.analysis_result = analyze_invoice_images(image_paths)
+
+        # Run OCR / analysis (even if you don't use result now)
+        result = analyze_invoice_images(image_paths)
+        st.session_state.analysis_result = result
+
+        # Upload images to ERPNext (ONCE)
+        if not st.session_state.erp_uploaded:
+            for local_path, uploaded_file in zip(image_paths, uploaded_files):
+                upload_file_to_erpnext(
+                    file_path=local_path,
+                    filename=uploaded_file.name,
+                    is_private=1,
+                )
+
+            st.session_state.erp_uploaded = True
+            st.success("Invoice image(s) uploaded to ERPNext successfully")
 
 
 # -------------------------------------------------
-# Show OCR Output
+# Show OCR Output (Optional, UI only)
 # -------------------------------------------------
 if st.session_state.analysis_result is not None:
-    st.subheader("OCR / Extracted Output")
+    st.subheader("OCR Output (Preview Only)")
     safe_display(st.session_state.analysis_result)
-
-
-# -------------------------------------------------
-# Upload invoice image(s) to ERPNext
-# -------------------------------------------------
-if st.session_state.image_paths and st.button("Upload Image(s) to ERPNext"):
-    with st.spinner("Uploading invoice image(s) to ERPNext..."):
-        uploaded_info = []
-
-        for local_path, uploaded_file in zip(
-            st.session_state.image_paths,
-            st.session_state.uploaded_files,
-        ):
-            info = upload_file_to_erpnext(
-                file_path=local_path,
-                filename=uploaded_file.name,
-                is_private=1,
-            )
-            uploaded_info.append(info)
-
-        st.session_state.uploaded_erp_files = uploaded_info
-
-        st.success("Invoice image(s) uploaded to ERPNext")
-        st.json(uploaded_info)
-
-
-# -------------------------------------------------
-# Save OCR details to ERPNext (Custom DocType)
-# -------------------------------------------------
-if (
-    st.session_state.uploaded_erp_files
-    and st.session_state.analysis_result is not None
-    and st.button("Save OCR Details to ERPNext")
-):
-    with st.spinner("Saving OCR details to ERPNext..."):
-
-        # Raw OCR text
-        ocr_raw = (
-            st.session_state.analysis_result
-            if isinstance(st.session_state.analysis_result, str)
-            else json.dumps(st.session_state.analysis_result, indent=2)
-        )
-
-        # Structured JSON (only if valid)
-        ocr_json = (
-            st.session_state.analysis_result
-            if isinstance(st.session_state.analysis_result, dict)
-            else None
-        )
-
-        records = []
-
-        for file_info in st.session_state.uploaded_erp_files:
-            record = create_invoice_ocr_record(
-                file_url=file_info["file_url"],
-                ocr_raw=ocr_raw,
-                ocr_json=ocr_json,
-            )
-            records.append(record)
-
-        st.success("OCR data saved in ERPNext (Invoice OCR Record)")
-        st.json(records)
 
 
 # -------------------------------------------------
 # Footer
 # -------------------------------------------------
 st.markdown("---")
-st.caption(
-    "Files are stored in ERPNext → File. "
-    "OCR data is stored in ERPNext → Invoice OCR Record."
-)
+st.caption("Invoice images are stored in ERPNext → File")
