@@ -82,10 +82,6 @@ def create_invoice_ocr_record(file_url, invoice_number):
         return None
 
 
-def extract_invoice_number(ocr_entities):
-    for entity in ocr_entities:
-        if entity.get("entity_type") == "invoice_number":
-            table_data = entity.get("table_data", [])
-            if table_data and isinstance(table_data, list):
-                return table_data[0].get("invoice_number")
-    return None
+def extract_invoice_number(ocr_json):
+    return ocr_json.get("invoice_number")
+

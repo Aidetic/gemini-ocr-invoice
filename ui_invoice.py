@@ -7,7 +7,6 @@ from invoice_app import analyze_invoice_images
 from erpnext_client import (
     upload_file_to_erpnext,
     create_invoice_ocr_record,
-    extract_invoice_number
 )
 
 # -------------------------------------------------
@@ -30,44 +29,13 @@ def safe_display(result):
 
 
 # -------------------------------------------------
-# Session state
-# -------------------------------------------------
-if "uploaded_files" not in st.session_state:
-    st.session_state.uploaded_files = None
-
-if "image_paths" not in st.session_state:
-    st.session_state.image_paths = []
-
-if "analysis_result" not in st.session_state:
-    st.session_state.analysis_result = None
-
-if "uploaded_erp_files" not in st.session_state:
-    st.session_state.uploaded_erp_files = []
-
-if "key_counter" not in st.session_state:
-    st.session_state.key_counter = 0
-
-
-# -------------------------------------------------
-# Reset
-# -------------------------------------------------
-if st.button("🔄 Start New Analysis"):
-    st.session_state.uploaded_files = None
-    st.session_state.image_paths = []
-    st.session_state.analysis_result = None
-    st.session_state.uploaded_erp_files = []
-    st.session_state.key_counter += 1
-    st.rerun()
-
-
-# -------------------------------------------------
 # UI
 # -------------------------------------------------
 st.title("Invoice OCR → ERPNext")
 
 st.write(
-    "Upload invoice images, extract OCR details using AI, "
-    "and store both the file and extracted data in ERPNext."
+    "Upload invoice images, analyze them using AI, "
+    "and automatically store the invoice and OCR data in ERPNext."
 )
 
 
@@ -78,14 +46,10 @@ uploaded_files = st.file_uploader(
     "Upload invoice images",
     type=["png", "jpg", "jpeg", "webp", "bmp", "tiff"],
     accept_multiple_files=True,
-    key=f"file_uploader_{st.session_state.key_counter}",
 )
 
-st.session_state.uploaded_files = uploaded_files
-
-
 # -------------------------------------------------
-# Preview
+# Preview images
 # -------------------------------------------------
 if uploaded_files:
     cols = st.columns(min(4, len(uploaded_files)))
@@ -95,92 +59,85 @@ if uploaded_files:
 
 
 # -------------------------------------------------
-# Analyze OCR
+# SINGLE ACTION: Analyze + Upload + Save
 # -------------------------------------------------
-if uploaded_files and st.button("Analyze Invoice(s)"):
-    with st.spinner("Running OCR and extraction..."):
-        image_paths = []
+if uploaded_files and st.button("Analyze & Save to ERPNext"):
+    with st.spinner("Analyzing invoice(s) and saving to ERPNext..."):
 
+        # ----------------------------------
+        # Save uploaded images to temp files
+        # ----------------------------------
+        image_paths = []
         for uploaded_file in uploaded_files:
             ext = os.path.splitext(uploaded_file.name)[1]
             with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
                 tmp.write(uploaded_file.getbuffer())
                 image_paths.append(tmp.name)
 
-        st.session_state.image_paths = image_paths
-        st.session_state.analysis_result = analyze_invoice_images(image_paths)
+        # ----------------------------------
+        # Run OCR / AI extraction
+        # ----------------------------------
+        analysis_result = analyze_invoice_images(image_paths)
 
+        st.subheader("OCR / Extracted Output")
+        safe_display(analysis_result)
 
-# -------------------------------------------------
-# Show OCR Output
-# -------------------------------------------------
-if st.session_state.analysis_result is not None:
-    st.subheader("OCR / Extracted Output")
-    safe_display(st.session_state.analysis_result)
+        # ----------------------------------
+        # Normalize OCR output → dict ONLY
+        # ----------------------------------
+        if isinstance(analysis_result, dict):
+            ocr_json = analysis_result
+        elif isinstance(analysis_result, str):
+            try:
+                ocr_json = json.loads(analysis_result)
+            except json.JSONDecodeError:
+                st.error("OCR output is not valid JSON")
+                st.stop()
+        else:
+            st.error(f"Unsupported OCR output type: {type(analysis_result)}")
+            st.stop()
 
+        # ----------------------------------
+        # Extract invoice number (guaranteed)
+        # ----------------------------------
+        invoice_number = ocr_json.get("invoice_number")
+        if not invoice_number:
+            st.error("Invoice number not found in OCR output")
+            st.stop()
 
-# -------------------------------------------------
-# Upload invoice image(s) to ERPNext
-# -------------------------------------------------
-if st.session_state.image_paths and st.button("Upload Image(s) to ERPNext"):
-    with st.spinner("Uploading invoice image(s) to ERPNext..."):
-        uploaded_info = []
-
-        for local_path, uploaded_file in zip(
-            st.session_state.image_paths,
-            st.session_state.uploaded_files,
-        ):
+        # ----------------------------------
+        # Upload images to ERPNext
+        # ----------------------------------
+        uploaded_erp_files = []
+        for local_path, uploaded_file in zip(image_paths, uploaded_files):
             info = upload_file_to_erpnext(
                 file_path=local_path,
                 filename=uploaded_file.name,
                 is_private=1,
             )
-            uploaded_info.append(info)
+            uploaded_erp_files.append(info)
 
-        st.session_state.uploaded_erp_files = uploaded_info
-
-        st.success("Invoice image(s) uploaded to ERPNext")
-        st.json(uploaded_info)
-
-
-
-# -------------------------------------------------
-# Save OCR details to ERPNext (Custom DocType)
-# -------------------------------------------------
-if (
-    st.session_state.uploaded_erp_files
-    and st.session_state.analysis_result is not None
-    and st.button("Save OCR Details to ERPNext")
-):
-    with st.spinner("Saving OCR details to ERPNext..."):
-
-        analysis_result = st.session_state.analysis_result
-
-        # ----------------------------
-        # Raw OCR text (always store)
-        # ----------------------------
-        ocr_raw = (
-            analysis_result
-            if isinstance(analysis_result, str)
-            else json.dumps(analysis_result, indent=2)
-        )
-
-        safe_display(ocr_raw)
-
-        invoice_number = extract_invoice_number(ocr_raw)
-
+        # ----------------------------------
+        # Create Invoice OCR Record(s)
+        # ----------------------------------
         records = []
-
-        for file_info in st.session_state.uploaded_erp_files:
+        for file_info in uploaded_erp_files:
             record = create_invoice_ocr_record(
                 file_url=file_info["file_url"],
                 invoice_number=invoice_number,
             )
             records.append(record)
 
-        st.success("OCR data saved in ERPNext (Invoice OCR Record)")
-        st.json(records)
+        # ----------------------------------
+        # Final output
+        # ----------------------------------
+        st.success("Invoice analyzed and saved to ERPNext successfully")
 
+        st.json({
+            "invoice_number": invoice_number,
+            "erp_files": uploaded_erp_files,
+            "ocr_records": records
+        })
 
 
 # -------------------------------------------------

@@ -62,3 +62,4 @@ uritemplate==4.1.1
 urllib3==2.3.0
 watchdog==6.0.0
 websockets==14.2
+openai
