@@ -125,6 +125,7 @@ if uploaded_files and st.button("Analyze & Save to ERPNext"):
             record = create_invoice_ocr_record(
                 file_url=file_info["file_url"],
                 invoice_number=invoice_number,
+                ocr_json = ocr_json
             )
             records.append(record)
 

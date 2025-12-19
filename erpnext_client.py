@@ -48,7 +48,7 @@ def upload_file_to_erpnext(
     return response.json()["message"]
 
 
-def create_invoice_ocr_record(file_url, invoice_number):
+def create_invoice_ocr_record(file_url, invoice_number, ocr_json):
     """
     Pushes OCR data to ERPNext from an external script.
     """
@@ -61,7 +61,8 @@ def create_invoice_ocr_record(file_url, invoice_number):
     # ERPNext Resource API expects the data inside a 'data' key or as direct keys
     payload = {
         "invoice_number": invoice_number,
-        "file_url": file_url
+        "file_url": file_url,
+        "ocr_json": ocr_json
     }
     
     # 4. Make the POST request
